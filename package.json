@@ -29,5 +29,8 @@
     "globals": "^15.10.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
   }
 }
