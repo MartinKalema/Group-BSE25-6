@@ -1,18 +1,36 @@
-version: '3'
+
 
 services:
   backend:
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: Dockerfile  # Make sure the Dockerfile is capitalized
     ports:
       - "5000:5000"
-    container_name: bse25-6
+    container_name: backend-bse25-6  # More descriptive container name
+    environment:
+      - NODE_ENV=production  # Set environment to production
+    volumes:
+      - ./:/app  # Maps the current directory (where the backend files are) to /app in the container # Mount the backend directory
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: dockerfile
+      dockerfile: Dockerfile  # Capitalized for consistency
+    container_name: frontend-bse25-6  # More descriptive container name
+    environment:
+      - NODE_ENV=production  # Production environment for frontend
+    volumes:
+      - ./frontend:/app  # Mount the frontend directory
     ports:
-      - "3000:3000"
-    container_name: group-bse25-6
+      - "3000:3000"  # Map frontend service port 3000 to the host
+
+
+  web:
+    image: nginx:alpine  # Using Nginx to serve the frontend
+    ports:
+      - "80:80"  # Expose port 80 for the web server
+    volumes:
+      - ./frontend/public:/usr/share/nginx/html # Serve the frontend build
+    depends_on:
+      - frontend  # Ensure frontend is built before running Nginx
