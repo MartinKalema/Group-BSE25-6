@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: $(IMAGE_URI_FRONTEND)
+          ports:
+            - containerPort: 8080
+      env:
+        - name: IMAGE_URI_FRONTEND
+          valueFrom:
+            configMapKeyRef:
+              name: env-config
+              key: IMAGE_URI_FRONTEND
