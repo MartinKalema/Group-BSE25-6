@@ -1,36 +1,60 @@
-
+version: '3.8'
 
 services:
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile  # Make sure the Dockerfile is capitalized
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "5000:5000"
-    container_name: backend-bse25-6  # More descriptive container name
+      - '5000:5000'
+    container_name: backend
     environment:
-      - NODE_ENV=production  # Set environment to production
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
     volumes:
-      - ./:/app  # Maps the current directory (where the backend files are) to /app in the container # Mount the backend directory
+      - ./backend:/app
+    depends_on:
+      - mysql
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile  # Capitalized for consistency
-    container_name: frontend-bse25-6  # More descriptive container name
+      dockerfile: Dockerfile
+    container_name: frontend
     environment:
-      - NODE_ENV=production  # Production environment for frontend
+      - NODE_ENV=production
     volumes:
-      - ./frontend:/app  # Mount the frontend directory
+      - ./frontend:/app
     ports:
-      - "3000:3000"  # Map frontend service port 3000 to the host
-
+      - '3000:3000'
 
   web:
-    image: nginx:alpine  # Using Nginx to serve the frontend
+    image: nginx:alpine
     ports:
-      - "80:80"  # Expose port 80 for the web server
+      - '80:80'
     volumes:
-      - ./frontend/public:/usr/share/nginx/html # Serve the frontend build
+      - ./frontend/public:/usr/share/nginx/html
     depends_on:
-      - frontend  # Ensure frontend is built before running Nginx
+      - frontend
+
+  mysql:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
+
+networks:
+  app-network:
+
+volumes:
+  mysql-data:
