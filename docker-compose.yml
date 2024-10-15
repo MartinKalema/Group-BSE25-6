@@ -18,6 +18,8 @@ services:
       - ./backend:/app
     depends_on:
       - mysql
+    networks:
+      - app-network
 
   frontend:
     build:
@@ -30,6 +32,8 @@ services:
       - ./frontend:/app
     ports:
       - '3000:3000'
+    networks:
+      - app-network
 
   web:
     image: nginx:alpine
@@ -39,6 +43,8 @@ services:
       - ./frontend/public:/usr/share/nginx/html
     depends_on:
       - frontend
+    networks:
+      - app-network
 
   mysql:
     image: mysql:5.7
