@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: frontend
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
@@ -14,12 +14,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: $(IMAGE_URI_FRONTEND)
+          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/bse256/frontend:latest
           ports:
             - containerPort: 8080
-      env:
-        - name: IMAGE_URI_FRONTEND
-          valueFrom:
-            configMapKeyRef:
-              name: env-config
-              key: IMAGE_URI_FRONTEND

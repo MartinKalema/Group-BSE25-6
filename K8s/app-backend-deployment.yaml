@@ -14,12 +14,6 @@ spec:
     spec:
       containers:
         - name: backend
-          image: $(IMAGE_URI_BACKEND)
+          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/bse256/backend:latest
           ports:
             - containerPort: 8080
-      env:
-        - name: IMAGE_URI_BACKEND
-          valueFrom:
-            configMapKeyRef:
-              name: env-config
-              key: IMAGE_URI_BACKEND
