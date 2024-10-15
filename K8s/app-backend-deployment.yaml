@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: backend
-          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/bse256/backend:latest
+          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/kalema/backend:latest
           ports:
             - containerPort: 8080
