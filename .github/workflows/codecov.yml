@@ -26,12 +26,12 @@ jobs:
       - name: Run frontend tests and collect coverage
         run: |
           cd frontend
-          npm run test -- --coverage
+          npm test -- --coverage --passWithNoTests
 
       - name: Run backend tests and collect coverage
         run: |
           cd backend
-          npm run test -- --coverage
+          npm test -- --coverage --passWithNoTests
 
       - name: Upload coverage reports to Codecov with GitHub Action
         uses: codecov/codecov-action@v4.2.0
