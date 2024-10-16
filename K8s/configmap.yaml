@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: env-config
-data:
-  IMAGE_URI_BACKEND: ${IMAGE_URI_BACKEND}
-  IMAGE_URI_FRONTEND: ${IMAGE_URI_FRONTEND}
