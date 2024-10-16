@@ -1,23 +1,51 @@
 const http = require('http');
+const { setTimeout } = require('timers/promises');
 
 const url = process.env.HEALTH_CHECK_URL || 'http://localhost:5000';
-const timeout = process.env.HEALTH_CHECK_TIMEOUT || 5000; // 5 seconds default
+const timeout = parseInt(process.env.HEALTH_CHECK_TIMEOUT, 10) || 5000; // 5 seconds default
+const retries = parseInt(process.env.HEALTH_CHECK_RETRIES, 10) || 3; // 3 retries default
+const retryDelay = parseInt(process.env.HEALTH_CHECK_RETRY_DELAY, 10) || 1000; // 1 second default
 
-const req = http.get(url, (res) => {
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-        console.error(`Health check failed. Status code: ${res.statusCode}`);
-        process.exit(1);
+async function healthCheck() {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const req = http.get(url, { timeout }, (res) => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          throw new Error(
+            `Health check failed. Status code: ${res.statusCode}`
+          );
+        }
+      });
+
+      // Handle response error
+      req.on('error', (err) => {
+        throw err;
+      });
+
+      // Wait for the request to complete
+      await new Promise((resolve, reject) => {
+        req.on('timeout', () => {
+          req.destroy(); // Destroy the request on timeout
+          reject(new Error(`Health check timed out after ${timeout}ms`));
+        });
+        req.on('end', resolve);
+      });
+
+      // If we reach here, the health check succeeded
+      console.log('Health check passed');
+      return; // Exit the function successfully
+    } catch (err) {
+      console.error(
+        `Health check failed. Attempt ${i + 1} of ${retries}. Error: ${
+          err.message
+        }`
+      );
+      await setTimeout(retryDelay);
     }
-    process.exit(0);
-});
+  }
 
-req.on('error', (err) => {
-    console.error(`Health check failed. Error: ${err.message}`);
-    process.exit(1);
-});
+  console.error(`Health check failed after ${retries} attempts`);
+  process.exit(1);
+}
 
-req.setTimeout(timeout, () => {
-    console.error(`Health check failed. Request timed out after ${timeout}ms`);
-    req.abort();
-    process.exit(1);
-});
+healthCheck();
