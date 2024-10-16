@@ -1,5 +1,5 @@
 {
-  "name": "backend",
+  "name": "server",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
@@ -25,6 +25,7 @@
     "jest-environment-jsdom": "^29.7.0"
   },
   "dependencies": {
-    "express": "^4.21.0"
+    "express": "^4.21.0",
+    "timers-promises": "^1.0.1"
   }
 }
