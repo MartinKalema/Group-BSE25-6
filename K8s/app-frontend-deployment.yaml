@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/kalema/frontend:latest
+          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/frontend/frontend:latest
           ports:
-            - containerPort: 3000
+            - containerPort: 80
