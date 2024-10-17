@@ -147,9 +147,11 @@ jobs:
             minikube start
           fi
 
-          kubectl delete services --all
+          kubectl delete services --all --ignore-not-found
 
-          kubectl delete deployments --all
+          kubectl delete deployments --all --ignore-not-found
+
+          sleep 10
 
           kubectl apply -f K8s/
 
