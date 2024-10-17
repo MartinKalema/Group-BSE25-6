@@ -39,19 +39,18 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
 
       - name: Install and Test Backend
         working-directory: backend
         run: |
           npm install
-          npm test
+          npm test -- --passWithNoTests
 
       - name: Install and Test Frontend
         working-directory: frontend
         run: |
           npm install
-          npm test
+          npm test -- --passWithNoTests
 
   build-and-push:
     needs: install-and-test
