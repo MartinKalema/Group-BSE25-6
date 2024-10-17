@@ -101,20 +101,15 @@ jobs:
     if: github.ref == 'refs/heads/staging'
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Configure AWS credentials
+      - name: Clone K8s folder
         run: |
-          echo "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" > aws_credentials.txt
-          echo "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" >> aws_credentials.txt
-          echo "AWS_REGION=${AWS_REGION}" >> aws_credentials.txt
-          aws configure import --csv file://aws_credentials.txt
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -k k8s/
+          git init deployment
+          cd deployment
+          git config --global init.defaultBranch staging
+          git remote add origin https://github.com/MartinKalema/Group-BSE25-6.git
+          git config core.sparseCheckout true
+          echo "K8s/" > .git/info/sparse-checkout
+          git fetch origin staging
+          git checkout staging
+          cp -r K8s ../../
+      
