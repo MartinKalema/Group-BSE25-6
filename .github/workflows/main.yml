@@ -147,6 +147,20 @@ jobs:
             minikube start
           fi
 
-          kubectl apply -f K8s/
+          kubectl delete deployments --ignore-not-found
+
+          kubectl delete services --ignore-not-found
+
+          cd K8s
+
+          kubectl apply -f namespace.yaml
+          kubectl apply -f configmap.yaml
+          kubectl apply -f mongo-secrets.yaml
+          kubectl apply -f mongodb-deployment.yaml
+          kubectl apply -f mongodb-service.yaml
+          kubectl apply -f backend-deployment.yaml
+          kubectl apply -f backend-service.yaml
+          kubectl apply -f frontend-deployment.yaml
+          kubectl apply -f frontend-service.yaml
 
           EOF
