@@ -121,7 +121,7 @@ jobs:
       - name: Deploy to Staging
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@3.13.201.22 << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{secrets.EC2_STATIC_IP}} << 'EOF'
 
           mkdir -p deployment
 
@@ -131,7 +131,7 @@ jobs:
 
           git config --global init.defaultBranch staging
 
-          git remote get-url origin || git remote add origin https://github.com/MartinKalema/Group-BSE25-6.git
+          git remote get-url origin || git remote add origin ${{secrets.PROJECT_URL}}
 
           git config core.sparseCheckout true
 
@@ -146,10 +146,6 @@ jobs:
           if ! minikube status | grep -q "Running"; then
             minikube start
           fi
-
-          kubectl delete services --all --ignore-not-found
-
-          kubectl delete deployments --all --ignore-not-found
 
           kubectl apply -f K8s/
 
