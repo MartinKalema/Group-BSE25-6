@@ -96,13 +96,23 @@ jobs:
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: build-and-push-ecr-image
     if: github.ref == 'refs/heads/staging'
 
     steps:
-      - name: Clone K8s folder
+      - name: Set up SSH
         run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Deploy to Staging
+        if: success()
+        run: |
+
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@3.13.201.22 << 'EOF'
+          mkdir -p deployment
           git init deployment
           cd deployment
           git config --global init.defaultBranch staging
@@ -112,4 +122,4 @@ jobs:
           git fetch origin staging
           git checkout staging
           cp -r K8s ../../
-      
+          EOF
