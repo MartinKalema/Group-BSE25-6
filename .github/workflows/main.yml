@@ -110,16 +110,26 @@ jobs:
       - name: Deploy to Staging
         if: success()
         run: |
-
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@3.13.201.22 << 'EOF'
+
           mkdir -p deployment
+
           git init deployment
+
           cd deployment
+
           git config --global init.defaultBranch staging
+
           git remote add origin https://github.com/MartinKalema/Group-BSE25-6.git
+
           git config core.sparseCheckout true
+
           echo "K8s/" > .git/info/sparse-checkout
+
           git fetch origin staging
+
           git checkout staging
+
           cp -r K8s ../../
+
           EOF
