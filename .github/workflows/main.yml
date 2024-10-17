@@ -151,8 +151,6 @@ jobs:
 
           kubectl delete deployments --all --ignore-not-found
 
-          sleep 10
-
           kubectl apply -f K8s/
 
           EOF
