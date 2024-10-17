@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: bse256
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: 654654367152.dkr.ecr.us-east-2.amazonaws.com/frontend:latest
+          ports:
+            - containerPort: 80
+          env:
+            - name: NODE_ENV
+              value: production
