@@ -155,6 +155,4 @@ jobs:
 
           kubectl apply -f K8s/
 
-          kubectl expose deployment frontend --type=NodePort --port=80
-
           EOF
