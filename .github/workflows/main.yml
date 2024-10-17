@@ -154,6 +154,7 @@ jobs:
           cd K8s
 
           kubectl apply -f namespace.yaml
+          kubectl apply -f configmap.yaml
           kubectl apply -f mongo-secrets.yaml
           kubectl apply -f mongodb-deployment.yaml
           kubectl apply -f mongodb-service.yaml
