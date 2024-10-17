@@ -147,6 +147,10 @@ jobs:
             minikube start
           fi
 
+          kubectl delete services --all
+
+          kubectl delete deployments --all
+
           kubectl apply -f K8s/
 
           kubectl expose deployment frontend --type=NodePort --port=80
