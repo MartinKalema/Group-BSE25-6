@@ -131,7 +131,7 @@ jobs:
 
           git config --global init.defaultBranch staging
 
-          git remote add origin https://github.com/MartinKalema/Group-BSE25-6.git
+          git remote get-url origin || git remote add origin https://github.com/MartinKalema/Group-BSE25-6.git
 
           git config core.sparseCheckout true
 
@@ -140,6 +140,12 @@ jobs:
           git fetch origin staging
 
           git checkout staging
+
+          git pull origin staging
+
+          if ! minikube status | grep -q "Running"; then
+            minikube start
+          fi
 
           kubectl apply -f K8s/
 
