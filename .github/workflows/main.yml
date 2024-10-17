@@ -133,7 +133,7 @@ jobs:
           DOCKER_SERVER: ${{ secrets.DOCKER_SERVER }}
           AWS_EMAIL: ${{ secrets.AWS_EMAIL }}
         run: |
-          ssh ubuntu@$EC2_HOST << EOF
+          ssh ubuntu@"$EC2_HOST" << 'EOF'
             if ! minikube status | grep -q "Running"; then
               minikube start
             fi
@@ -149,19 +149,24 @@ jobs:
             git checkout $DEPLOYMENT_BRANCH
             git pull origin $DEPLOYMENT_BRANCH
 
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $DOCKER_SERVER
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ secrets.AWS_REGION }}
+
+            export ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
 
             kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
             kubectl create secret docker-registry ecr-secret \
               --docker-server=$DOCKER_SERVER \
               --docker-username=AWS \
-              --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
+              --docker-password=$ECR_PASSWORD \
               --docker-email=$AWS_EMAIL \
-              -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+              --namespace=$NAMESPACE \
+              --dry-run=client -o yaml | kubectl apply -f -
             kubectl patch serviceaccount default -n $NAMESPACE -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
-            kubectl get deployment backend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}' > /tmp/backend_previous_image
-            kubectl get deployment frontend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}' > /tmp/frontend_previous_image
+            kubectl get deployment backend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}' > /tmp/backend_previous_image || echo "No previous backend deployment" > /tmp/backend_previous_image
+            kubectl get deployment frontend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}' > /tmp/frontend_previous_image || echo "No previous frontend deployment" > /tmp/frontend_previous_image
 
             cd K8s
             kubectl apply -f namespace.yaml
@@ -174,11 +179,11 @@ jobs:
             kubectl apply -f frontend-deployment.yaml
             kubectl apply -f frontend-service.yaml
 
-            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n $NAMESPACE
-            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n $NAMESPACE
+            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n $NAMESPACE --record
+            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n $NAMESPACE --record
 
-            kubectl rollout status deployment/backend -n $NAMESPACE
-            kubectl rollout status deployment/frontend -n $NAMESPACE
+            kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
+            kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
 
             nohup kubectl port-forward svc/frontend -n $NAMESPACE 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
 
@@ -207,12 +212,13 @@ jobs:
           EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
           NAMESPACE: ${{ secrets.NAMESPACE }}
         run: |
-          ssh ubuntu@$EC2_HOST << EOF
+          ssh ubuntu@"$EC2_HOST" << 'EOF'
+            set -e
             BACKEND_PREVIOUS_IMAGE=$(cat /tmp/backend_previous_image)
             FRONTEND_PREVIOUS_IMAGE=$(cat /tmp/frontend_previous_image)
 
-            kubectl set image deployment/backend backend=$BACKEND_PREVIOUS_IMAGE -n $NAMESPACE
-            kubectl set image deployment/frontend frontend=$FRONTEND_PREVIOUS_IMAGE -n $NAMESPACE
+            kubectl set image deployment/backend backend=$BACKEND_PREVIOUS_IMAGE -n $NAMESPACE || { echo "Backend rollback failed"; exit 1; }
+            kubectl set image deployment/frontend frontend=$FRONTEND_PREVIOUS_IMAGE -n $NAMESPACE || { echo "Frontend rollback failed"; exit 1; }
 
             kubectl rollout status deployment/backend -n $NAMESPACE
             kubectl rollout status deployment/frontend -n $NAMESPACE
@@ -236,11 +242,19 @@ jobs:
 
       - name: Delete old ECR images
         run: |
+          set -e
           REPOSITORIES=(${{ secrets.ECR_BACKEND_REPOSITORY }} ${{ secrets.ECR_FRONTEND_REPOSITORY }})
           for REPO in "${REPOSITORIES[@]}"
           do
-            IMAGES_TO_DELETE=$(aws ecr list-images --repository-name "$REPO" --query 'imageIds[?type(imageTag)!=`string`].[imageDigest]' --output text)
-            if [ ! -z "$IMAGES_TO_DELETE" ]; then
-              aws ecr batch-delete-image --repository-name "$REPO" --image-ids "$IMAGES_TO_DELETE"
+            echo "Cleaning up repository: $REPO"
+            IMAGES_TO_DELETE=$(aws ecr list-images --repository-name "$REPO" --query 'imageIds[?type(imageTag)!=`string`].[imageDigest]' --output text | tr '\t' '\n' | sort | head -n -5)
+            if [ -n "$IMAGES_TO_DELETE" ]; then
+              if aws ecr batch-delete-image --repository-name "$REPO" --image-ids $(echo "$IMAGES_TO_DELETE" | jq -R -s -c 'split("\n")[:-1] | map({imageDigest: .})'); then
+                echo "Successfully deleted old images in $REPO"
+              else
+                echo "Failed to delete images in $REPO"
+              fi
+            else
+              echo "No images to delete in $REPO"
             fi
           done
