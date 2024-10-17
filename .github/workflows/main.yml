@@ -1,63 +1,69 @@
 name: CI/CD Pipeline
 
-# Trigger the workflow on push or pull request to the staging branch
 on:
   push:
-    branches:
-      - staging
-    paths-ignore:
-      - 'README.md'
+    branches: [staging, production]
+  pull_request:
+    branches: [staging, production]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - rollback
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
-  install:
+  install-and-test:
     runs-on: ubuntu-latest
-
+    if: github.event.inputs.action != 'rollback'
     steps:
-      # Check out the repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-      # Install dependencies and run tests for the backend
-      - name: Install backend dependencies
+      - name: Install and Test Backend
+        working-directory: backend
         run: |
-          cd backend
           npm install
+          npm test
 
-      - name: Run backend tests
+      - name: Install and Test Frontend
+        working-directory: frontend
         run: |
-          cd backend/__tests__
-          npm test -- --passWithNoTests
-
-      # Install dependencies and run tests for the frontend
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
           npm install
+          npm test
 
-      - name: Run frontend tests
-        run: |
-          cd frontend/__tests__
-          npm test -- --passWithNoTests
-
-  build-and-push-ecr-image:
-    name: Continuous Delivery
-    needs: install
+  build-and-push:
+    needs: install-and-test
     runs-on: ubuntu-latest
+    if: github.event.inputs.action != 'rollback'
+    outputs:
+      backend_image: ${{ steps.build_backend.outputs.image }}
+      frontend_image: ${{ steps.build_frontend.outputs.image }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Install Utilities
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq unzip
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -69,37 +75,158 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # Build and push backend Docker image
-      - name: Build, tag, and push backend image to Amazon ECR
-        id: build-backend-image
+      - name: Build and push backend image
+        id: build_backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Pushing to ECR repository: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      # Build and push frontend Docker image
-      - name: Build, tag, and push frontend image to Amazon ECR
-        id: build-frontend-image
+      - name: Build and push frontend image
+        id: build_frontend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Pushing to ECR repository: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
-    needs: build-and-push-ecr-image
-    if: github.ref == 'refs/heads/staging'
+    if: github.event.inputs.action != 'rollback'
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+    outputs:
+      deploy_success: ${{ steps.deploy.outputs.deploy_success }}
 
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_STATIC_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        id: deploy
+        env:
+          EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
+          ECR_BACKEND_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
+          ECR_FRONTEND_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          NAMESPACE: ${{secrets.NAMESPACE}}
+          DEPLOYMENT_BRANCH: ${{ github.event.inputs.environment || 'staging' }}
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
+          PROJECT_URL: ${{ secrets.PROJECT_URL }}
+          DOCKER_SERVER: ${{ secrets.DOCKER_SERVER }}
+          AWS_EMAIL: ${{ secrets.AWS_EMAIL }}
+        run: |
+          ssh ubuntu@$EC2_HOST << EOF
+            if ! minikube status | grep -q "Running"; then
+              minikube start
+            fi
+
+            mkdir -p deployment
+            cd deployment
+            git init
+            git config --global init.defaultBranch $DEPLOYMENT_BRANCH
+            git remote get-url origin || git remote add origin $PROJECT_URL
+            git config core.sparseCheckout true
+            echo "K8s/" > .git/info/sparse-checkout
+            git fetch origin $DEPLOYMENT_BRANCH
+            git checkout $DEPLOYMENT_BRANCH
+            git pull origin $DEPLOYMENT_BRANCH
+
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $DOCKER_SERVER
+
+            kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create secret docker-registry ecr-secret \
+              --docker-server=$DOCKER_SERVER \
+              --docker-username=AWS \
+              --docker-password=$(aws ecr get-login-password --region $AWS_REGION) \
+              --docker-email=$AWS_EMAIL \
+              -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+            kubectl patch serviceaccount default -n $NAMESPACE -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
+
+            kubectl get deployment backend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}' > /tmp/backend_previous_image
+            kubectl get deployment frontend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}' > /tmp/frontend_previous_image
+
+            cd K8s
+            kubectl apply -f namespace.yaml
+            kubectl apply -f configmap.yaml
+            kubectl apply -f mongo-secrets.yaml
+            kubectl apply -f mongodb-deployment.yaml
+            kubectl apply -f mongodb-service.yaml
+            kubectl apply -f backend-deployment.yaml
+            kubectl apply -f backend-service.yaml
+            kubectl apply -f frontend-deployment.yaml
+            kubectl apply -f frontend-service.yaml
+
+            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n $NAMESPACE
+            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n $NAMESPACE
+
+            kubectl rollout status deployment/backend -n $NAMESPACE
+            kubectl rollout status deployment/frontend -n $NAMESPACE
+
+            nohup kubectl port-forward svc/frontend -n $NAMESPACE 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
+
+            echo "$BACKEND_IMAGE" > /tmp/backend_current_image
+            echo "$FRONTEND_IMAGE" > /tmp/frontend_current_image
+          EOF
+          echo "deploy_success=true" >> $GITHUB_OUTPUT
+
+  rollback:
+    runs-on: ubuntu-latest
+    if: failure() || github.event.inputs.action == 'rollback'
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_STATIC_IP }} >> ~/.ssh/known_hosts
+
+      - name: Rollback Deployment
+        env:
+          EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
+          NAMESPACE: ${{ secrets.NAMESPACE }}
+        run: |
+          ssh ubuntu@$EC2_HOST << EOF
+            BACKEND_PREVIOUS_IMAGE=$(cat /tmp/backend_previous_image)
+            FRONTEND_PREVIOUS_IMAGE=$(cat /tmp/frontend_previous_image)
+
+            kubectl set image deployment/backend backend=$BACKEND_PREVIOUS_IMAGE -n $NAMESPACE
+            kubectl set image deployment/frontend frontend=$FRONTEND_PREVIOUS_IMAGE -n $NAMESPACE
+
+            kubectl rollout status deployment/backend -n $NAMESPACE
+            kubectl rollout status deployment/frontend -n $NAMESPACE
+
+            echo "Rollback completed. Reverted to previous versions:"
+            echo "Backend: $BACKEND_PREVIOUS_IMAGE"
+            echo "Frontend: $FRONTEND_PREVIOUS_IMAGE"
+          EOF
+
+  cleanup:
+    needs: [deploy, rollback]
+    runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -108,73 +235,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Set up SSH
+      - name: Delete old ECR images
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-      - name: Deploy to Staging
-        if: success()
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP }} << 'EOF'
-
-          mkdir -p deployment
-
-          git init deployment
-
-          cd deployment
-
-          git config --global init.defaultBranch staging
-
-          git remote get-url origin || git remote add origin ${{ secrets.PROJECT_URL }}
-
-          git config core.sparseCheckout true
-
-          echo "K8s/" > .git/info/sparse-checkout
-
-          git fetch origin staging
-
-          git checkout staging
-
-          git pull origin staging
-
-          if ! minikube status | grep -q "Running"; then
-            minikube start
-          fi
-
-          kubectl delete deployments --all --all-namespaces --ignore-not-found
-
-          kubectl delete services --all --all-namespaces --ignore-not-found
-
-          cd K8s
-
-          kubectl apply -f namespace.yaml
-
-          sudo apt install awscli
-
-          export ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
-
-          kubectl create secret docker-registry ecr-secret \
-          --docker-server=${{ secrets.DOCKER_SERVER }} \
-          --docker-username=AWS \
-          --docker-password="$ECR_PASSWORD" \
-          --docker-email=${{ secrets.AWS_EMAIL }} \
-          -n bse256
-
-          kubectl patch serviceaccount default -n bse256 -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
-
-          kubectl apply -f configmap.yaml
-          kubectl apply -f mongo-secrets.yaml
-          kubectl apply -f mongodb-deployment.yaml
-          kubectl apply -f mongodb-service.yaml
-          kubectl apply -f backend-deployment.yaml
-          kubectl apply -f backend-service.yaml
-          kubectl apply -f frontend-deployment.yaml
-          kubectl apply -f frontend-service.yaml
-
-          EOF
+          REPOSITORIES=(${{ secrets.ECR_BACKEND_REPOSITORY }} ${{ secrets.ECR_FRONTEND_REPOSITORY }})
+          for REPO in "${REPOSITORIES[@]}"
+          do
+            IMAGES_TO_DELETE=$(aws ecr list-images --repository-name "$REPO" --query 'imageIds[?type(imageTag)!=`string`].[imageDigest]' --output text)
+            if [ ! -z "$IMAGES_TO_DELETE" ]; then
+              aws ecr batch-delete-image --repository-name "$REPO" --image-ids "$IMAGES_TO_DELETE"
+            fi
+          done
