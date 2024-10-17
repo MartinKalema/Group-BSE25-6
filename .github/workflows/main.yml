@@ -121,7 +121,7 @@ jobs:
       - name: Deploy to Staging
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{secrets.EC2_STATIC_IP}} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP }} << 'EOF'
 
           mkdir -p deployment
 
@@ -131,7 +131,7 @@ jobs:
 
           git config --global init.defaultBranch staging
 
-          git remote get-url origin || git remote add origin ${{secrets.PROJECT_URL}}
+          git remote get-url origin || git remote add origin ${{ secrets.PROJECT_URL }}
 
           git config core.sparseCheckout true
 
@@ -154,6 +154,20 @@ jobs:
           cd K8s
 
           kubectl apply -f namespace.yaml
+
+          sudo apt install awscli
+
+          export ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
+
+          kubectl create secret docker-registry ecr-secret \
+          --docker-server=${{ secrets.DOCKER_SERVER }} \
+          --docker-username=AWS \
+          --docker-password="$ECR_PASSWORD" \
+          --docker-email=${{ secrets.AWS_EMAIL }} \
+          -n bse256
+
+          kubectl patch serviceaccount default -n bse256 -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
+
           kubectl apply -f configmap.yaml
           kubectl apply -f mongo-secrets.yaml
           kubectl apply -f mongodb-deployment.yaml
