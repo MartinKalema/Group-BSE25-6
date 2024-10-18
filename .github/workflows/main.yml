@@ -121,7 +121,7 @@ jobs:
       - name: Deploy to EC2
         id: deploy
         env:
-          EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
+          EC2_HOST: ${{ secrets.EC2_STATIC_IP }} # Hello
           ECR_BACKEND_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
           ECR_FRONTEND_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
