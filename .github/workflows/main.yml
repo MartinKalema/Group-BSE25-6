@@ -135,7 +135,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          ssh ubuntu@"$EC2_HOST" << EOF
+          ssh ubuntu@"$EC2_HOST" << 'EOF'
             set -euo pipefail
             
             export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
@@ -160,13 +160,15 @@ jobs:
 
             kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
+            export ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION)
+
             kubectl create secret docker-registry ecr-secret \
-              --docker-server="$DOCKER_SERVER" \
-              --docker-username=AWS \
-              --docker-password=$(aws ecr get-login-password --region "$AWS_REGION") \
-              --docker-email="$AWS_EMAIL" \
-              --namespace="$NAMESPACE" \
-              --dry-run=client -o yaml | kubectl apply -f -
+            --docker-server="$DOCKER_SERVER" \
+            --docker-username=AWS \
+            --docker-password="$ECR_PASSWORD" \
+            --docker-email="$AWS_EMAIL" \
+            -n "NAMESPACE" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
             kubectl patch serviceaccount default -n "$NAMESPACE" -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
