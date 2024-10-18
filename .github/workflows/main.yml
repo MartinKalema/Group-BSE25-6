@@ -132,6 +132,8 @@ jobs:
           PROJECT_URL: ${{ secrets.PROJECT_URL }}
           DOCKER_SERVER: ${{ secrets.DOCKER_SERVER }}
           AWS_EMAIL: ${{ secrets.AWS_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           ssh ubuntu@"$EC2_HOST" << 'EOF'
             set -euo pipefail
