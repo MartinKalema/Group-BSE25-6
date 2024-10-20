@@ -83,7 +83,7 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "uri='$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG'" >> "$GITHUB_OUTPUT"
+          echo "::set-output name=uri::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Debug: Backend image set to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
       - name: Build and push frontend image
@@ -95,7 +95,7 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "uri='$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG'" >> "$GITHUB_OUTPUT"
+          echo "::set-output name=uri::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Debug: Frontend image set to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
   deploy:
