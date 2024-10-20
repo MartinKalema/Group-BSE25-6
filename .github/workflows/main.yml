@@ -147,9 +147,9 @@ jobs:
             minikube start
           fi
 
-          kubectl delete deployments --all --all-namespaces --ignore-not-found
+          kubectl delete deployments --all -n bse256 --ignore-not-found
 
-          kubectl delete services --all --all-namespaces --ignore-not-found
+          kubectl delete services --all -n bse256 --ignore-not-found
 
           cd K8s
 
