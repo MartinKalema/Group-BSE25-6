@@ -114,14 +114,13 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_STATIC_IP }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         id: deploy
         env:
-          EC2_HOST: ${{ secrets.EC2_STATIC_IP }} # Hello
+          EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
           ECR_BACKEND_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
           ECR_FRONTEND_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -134,8 +133,10 @@ jobs:
           AWS_EMAIL: ${{ secrets.AWS_EMAIL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        if: success()
         run: |
-          ssh ubuntu@"$EC2_HOST" << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << 'EOF'
+
             set -euo pipefail
             
             aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
