@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   backend:
     build:
@@ -8,10 +10,10 @@ services:
     container_name: backend
     environment:
       - NODE_ENV=production
-      - MONGO_URI=mongodb://mongodb:27017
-      - MONGO_DB=${MONGO_DB}
+      - MONGO_URI=mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin
     volumes:
       - ./backend:/app
+      - /app/node_modules
     depends_on:
       - mongodb
     networks:
@@ -26,10 +28,13 @@ services:
       - NODE_ENV=production
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     ports:
       - '80:80'
     stdin_open: true
     tty: true
+    depends_on:
+      - backend
     networks:
       - app-network
 
@@ -40,6 +45,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
     ports:
       - '27017:27017'
     volumes:
