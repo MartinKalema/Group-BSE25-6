@@ -135,15 +135,15 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -o SendEnv=AWS_ACCESS_KEY_ID -o SendEnv=AWS_SECRET_ACCESS_KEY - SendEnv=AWS_REGION ubuntu@$EC2_HOST << EOF
 
             set -euo pipefail
             
             sudo apt install awscli
 
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region $AWS_REGION
+            aws configure set aws_access_key_id \$AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key \$AWS_SECRET_ACCESS_KEY
+            aws configure set region \$AWS_REGION
 
             if ! aws sts get-caller-identity &>/dev/null; then
               echo "Error: AWS credentials are not valid or not set correctly"
@@ -168,7 +168,7 @@ jobs:
 
             kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
-            export ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION)
+            export ECR_PASSWORD=\$(aws ecr get-login-password --region $AWS_REGION)
 
             kubectl create secret docker-registry ecr-secret \
             --docker-server=$DOCKER_SERVER \
@@ -220,7 +220,7 @@ jobs:
           EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
           NAMESPACE: ${{ secrets.NAMESPACE }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << EOF
             set -euo pipefail
 
             kubectl rollout undo deployment/backend -n $NAMESPACE && \
