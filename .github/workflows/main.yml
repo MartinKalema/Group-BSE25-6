@@ -118,8 +118,6 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Set up SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
@@ -133,8 +131,7 @@ jobs:
           FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << 'EOF'
-
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
             set -euo pipefail
 
             if ! command -v minikube &> /dev/null; then
@@ -149,20 +146,20 @@ jobs:
 
             rm -rf deployment
 
-            git clone --branch $DEPLOYMENT_BRANCH --depth 1 --filter=blob:none --sparse ${{ secrets.PROJECT_URL }} deployment
+            git clone --branch ${DEPLOYMENT_BRANCH} --depth 1 --filter=blob:none --sparse ${{ secrets.PROJECT_URL }} deployment
             cd deployment
             git sparse-checkout set K8s/
 
             kubectl create namespace ${{ secrets.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
 
-            export ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
+            export ECR_PASSWORD=\$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
 
             kubectl create secret docker-registry ecr-secret \
             --docker-server=${{ secrets.DOCKER_SERVER }} \
-            --docker-username=AWS \
-            --docker-password="$ECR_PASSWORD" \
+            --docker-username=${{ secrets.DOCKER_USERNAME }} \
+            --docker-password="\${ECR_PASSWORD}" \
             --docker-email=${{ secrets.AWS_EMAIL }} \
-            -n bse256
+            -n ${{ secrets.NAMESPACE}}
 
             kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
@@ -170,20 +167,19 @@ jobs:
 
             kubectl apply -f .
 
-            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n ${{ secrets.NAMESPACE}} --record
-            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n ${{ secrets.NAMESPACE}} --record
+            kubectl set image deployment/backend backend=${BACKEND_IMAGE} -n ${{ secrets.NAMESPACE}} --record
+            kubectl set image deployment/frontend frontend=${FRONTEND_IMAGE} -n ${{ secrets.NAMESPACE}} --record
 
-            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image $BACKEND_IMAGE" --overwrite -n ${{ secrets.NAMESPACE}}
-            kubectl annotate deployment/backend previous-image="$BACKEND_IMAGE" --overwrite -n "${{ secrets.NAMESPACE}}"
-            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image $FRONTEND_IMAGE" --overwrite -n ${{ secrets.NAMESPACE}}
-            kubectl annotate deployment/frontend previous-image=$FRONTEND_IMAGE --overwrite -n ${{ secrets.NAMESPACE}}
+            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image ${BACKEND_IMAGE}" --overwrite -n ${{ secrets.NAMESPACE}}
+            kubectl annotate deployment/backend previous-image="${BACKEND_IMAGE}" --overwrite -n "${{ secrets.NAMESPACE}}"
+            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image ${FRONTEND_IMAGE}" --overwrite -n ${{ secrets.NAMESPACE}}
+            kubectl annotate deployment/frontend previous-image=${FRONTEND_IMAGE} --overwrite -n ${{ secrets.NAMESPACE}}
 
             kubectl rollout status deployment/backend -n ${{ secrets.NAMESPACE}} --timeout=300s
             kubectl rollout status deployment/frontend -n ${{ secrets.NAMESPACE}} --timeout=300s
 
             pkill -f "kubectl port-forward" || true
             nohup kubectl port-forward svc/frontend -n ${{ secrets.NAMESPACE}} 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
-
           EOF
           echo "deploy_success=true" >> $GITHUB_OUTPUT
 
