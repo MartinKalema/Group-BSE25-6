@@ -163,7 +163,8 @@ jobs:
             --docker-username=${{ secrets.DOCKER_USERNAME }} \
             --docker-password="\${ECR_PASSWORD}" \
             --docker-email=${{ secrets.AWS_EMAIL }} \
-            --namespace=${{ secrets.NAMESPACE}}
+            --namespace=${{ secrets.NAMESPACE}} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
             kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
@@ -187,7 +188,7 @@ jobs:
           EOF
           echo "deploy_success=true" >> $GITHUB_OUTPUT
 
-  rollback:
+  rollback: 
     runs-on: ubuntu-latest
     if: failure() || github.event.inputs.action == 'rollback'
     environment:
@@ -201,7 +202,7 @@ jobs:
 
       - name: Rollback Deployment
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
             set -euo pipefail
 
             kubectl rollout undo deployment/backend -n ${{ secrets.NAMESPACE}} && \
