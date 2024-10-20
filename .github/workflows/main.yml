@@ -108,6 +108,9 @@ jobs:
       deploy_success: ${{ steps.deploy.outputs.deploy_success }}
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        
       - name: Debug Build Outputs
         run: |
           echo "Backend Image: ${{ needs.build-and-push.outputs.backend_image }}"
