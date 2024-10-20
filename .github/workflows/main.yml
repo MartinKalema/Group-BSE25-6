@@ -164,7 +164,6 @@ jobs:
             --docker-password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }}) \
             --docker-email=${{ secrets.AWS_EMAIL}} \
             --namespace=${{ secrets.NAMESPACE}} \
-            --dry-run=client -o yaml | kubectl apply -f -
 
             kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
