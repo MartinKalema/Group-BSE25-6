@@ -20,7 +20,7 @@ spec:
             - containerPort: 5000
           env:
             - name: MONGO_URI
-              value: "mongodb://admin:admin@mongodb:27017/dental"
+              value: "mongodb://admin:admin@mongodb:27017/admin"
           readinessProbe:
             exec:
               command: ['node', 'healthcheck.js']
