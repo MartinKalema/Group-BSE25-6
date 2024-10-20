@@ -19,17 +19,12 @@ spec:
           ports:
             - containerPort: 5000
           env:
-            - name: NODE_ENV
-              value: production
             - name: MONGO_URI
-              value: mongodb://db:27017
-            - name: MONGO_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: mongo-config
-                  key: MONGO_DB
+              value: "mongodb://admin:admin@mongodb:27017/admin"
           readinessProbe:
             exec:
               command: ['node', 'healthcheck.js']
-            initialDelaySeconds: 5
-            periodSeconds: 30
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3

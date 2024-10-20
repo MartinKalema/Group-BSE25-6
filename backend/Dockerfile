@@ -1,14 +1,11 @@
 FROM node:20-alpine
 
-RUN mkdir /usr/backend
-
 WORKDIR /usr/backend
 
-COPY package*.json .
-
+COPY package*.json ./
 RUN npm install
 
-COPY . . --exclude=node_modules/
+COPY . .
 
 EXPOSE 5000
 

@@ -1,31 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: db
+  name: mongodb
   namespace: bse256
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: db
+      app: mongodb
   template:
     metadata:
       labels:
-        app: db
+        app: mongodb
     spec:
       containers:
-        - name: db
+        - name: mongodb
           image: mongo:latest
           ports:
             - containerPort: 27017
           env:
             - name: MONGO_INITDB_ROOT_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secrets
-                  key: mongo_root_username
+              value: 'admin'
             - name: MONGO_INITDB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secrets
-                  key: mongo_root_password
+              value: 'admin'

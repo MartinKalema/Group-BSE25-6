@@ -25,7 +25,9 @@
     "jest-environment-jsdom": "^29.7.0"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "mongoose": "^8.7.2",
     "timers-promises": "^1.0.1"
   }
 }
