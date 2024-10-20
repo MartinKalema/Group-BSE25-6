@@ -22,14 +22,14 @@ spec:
             - name: NODE_ENV
               value: production
             - name: MONGO_URI
-              value: mongodb://db:27017
-            - name: MONGO_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: mongo-config
-                  key: MONGO_DB
+              value: mongodb://$(MONGO_ROOT_USERNAME):$(MONGO_ROOT_PASSWORD)@mongodb:27017/bse256?authSource=admin
+          envFrom:
+            - secretRef:
+                name: mongodb-secret
           readinessProbe:
             exec:
               command: ['node', 'healthcheck.js']
-            initialDelaySeconds: 5
-            periodSeconds: 30
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
