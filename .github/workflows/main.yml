@@ -106,17 +106,6 @@ jobs:
       deploy_success: ${{ steps.deploy.outputs.deploy_success }}
 
     steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
@@ -133,6 +122,21 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
             set -euo pipefail
+
+            if ! command -v aws &> /dev/null; then
+              echo "AWS CLI not found, installing..."
+              sudo apt update
+              sudo apt install -y awscli
+            fi
+
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ secrets.AWS_REGION }}
+
+            if ! aws sts get-caller-identity &>/dev/null; then
+              echo "Error: AWS credentials are not valid or not set correctly"
+              exit 1
+            fi
 
             if ! command -v minikube &> /dev/null; then
               echo "Minikube not found, installing..."
@@ -159,7 +163,7 @@ jobs:
             --docker-username=${{ secrets.DOCKER_USERNAME }} \
             --docker-password="\${ECR_PASSWORD}" \
             --docker-email=${{ secrets.AWS_EMAIL }} \
-            -n ${{ secrets.NAMESPACE}}
+            --namespace=${{ secrets.NAMESPACE}}
 
             kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
