@@ -21,11 +21,16 @@ spec:
           env:
             - name: NODE_ENV
               value: production
-            - name: MONGO_URI
-              value: mongodb://$(MONGO_ROOT_USERNAME):$(MONGO_ROOT_PASSWORD)@db:27017/bse256?authSource=admin
-          envFrom:
-            - secretRef:
-                name: mongodb-secret
+            - name: MONGO_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo_root_username
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo_root_password
           readinessProbe:
             exec:
               command: ['node', 'healthcheck.js']

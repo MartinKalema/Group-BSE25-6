@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 
@@ -6,9 +7,10 @@ const app = express();
 // MongoDB connection
 const MONGO_URI =
   process.env.MONGO_URI ||
-  'mongodb://admin:admin@db:27017/bse256?authSource=admin';
+  `mongodb://${process.env.MONGO_ROOT_USERNAME}:${process.env.MONGO_ROOT_PASSWORD}@db:27017/bse256?authSource=admin`;
+
 mongoose
-  .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(MONGO_URI)
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
