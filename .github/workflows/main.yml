@@ -106,8 +106,16 @@ jobs:
       deploy_success: ${{ steps.deploy.outputs.deploy_success }}
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
       - name: Set up SSH
         env:
@@ -125,20 +133,9 @@ jobs:
           FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << 'EOF'
 
             set -euo pipefail
-
-            sudo apt install awscli
-
-            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws configure set region ${{ secrets.AWS_REGION}}
-
-            if ! aws sts get-caller-identity &>/dev/null; then
-              echo "Error: AWS credentials are not valid or not set correctly"
-              exit 1
-            fi
 
             if ! command -v minikube &> /dev/null; then
               echo "Minikube not found, installing..."
@@ -204,7 +201,7 @@ jobs:
 
       - name: Rollback Deployment
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << 'EOF'
             set -euo pipefail
 
             kubectl rollout undo deployment/backend -n ${{ secrets.NAMESPACE}} && \
