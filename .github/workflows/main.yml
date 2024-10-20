@@ -136,17 +136,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << EOF
 
             set -euo pipefail
-            
-            sudo apt install awscli
-
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region $AWS_REGION
-
-            if ! aws sts get-caller-identity &>/dev/null; then
-              echo "Error: AWS credentials are not valid or not set correctly"
-              exit 1
-            fi
 
             if ! command -v minikube &> /dev/null; then
               echo "Minikube not found, installing..."
