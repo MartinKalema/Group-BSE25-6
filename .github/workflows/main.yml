@@ -169,16 +169,39 @@ jobs:
             kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
             cd K8s
-
+            
             kubectl apply -f .
 
-            kubectl set image deployment/backend backend=${BACKEND_IMAGE} -n ${{ secrets.NAMESPACE}} --record
-            kubectl set image deployment/frontend frontend=${FRONTEND_IMAGE} -n ${{ secrets.NAMESPACE}} --record
+            deploy_or_update() {
+              local deployment=\$1
+              local container=\$2
+              local image=\$3
+              
+              if kubectl get deployment \$deployment -n ${{ secrets.NAMESPACE}} &>/dev/null; then
+                echo "Updating existing \$deployment deployment"
+                kubectl set image deployment/\$deployment \$container=\$image -n ${{ secrets.NAMESPACE}}
+              else
+                echo "Creating new \$deployment deployment"
+                kubectl create deployment \$deployment --image=\$image -n ${{ secrets.NAMESPACE}}
+              fi
+              
+              kubectl annotate deployment/\$deployment kubernetes.io/change-cause="Deployed image \$image" --overwrite -n ${{ secrets.NAMESPACE}}
+              kubectl annotate deployment/\$deployment previous-image="\$image" --overwrite -n ${{ secrets.NAMESPACE}}
+            }
 
-            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image ${BACKEND_IMAGE}" --overwrite -n ${{ secrets.NAMESPACE}}
-            kubectl annotate deployment/backend previous-image="${BACKEND_IMAGE}" --overwrite -n "${{ secrets.NAMESPACE}}"
-            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image ${FRONTEND_IMAGE}" --overwrite -n ${{ secrets.NAMESPACE}}
-            kubectl annotate deployment/frontend previous-image=${FRONTEND_IMAGE} --overwrite -n ${{ secrets.NAMESPACE}}
+            if [ -n "${BACKEND_IMAGE}" ]; then
+              deploy_or_update "backend" "backend" "${BACKEND_IMAGE}"
+            else
+              echo "Error: BACKEND_IMAGE is empty or not set"
+              exit 1
+            fi
+
+            if [ -n "${FRONTEND_IMAGE}" ]; then
+              deploy_or_update "frontend" "frontend" "${FRONTEND_IMAGE}"
+            else
+              echo "Error: FRONTEND_IMAGE is empty or not set"
+              exit 1
+            fi
 
             kubectl rollout status deployment/backend -n ${{ secrets.NAMESPACE}} --timeout=300s
             kubectl rollout status deployment/frontend -n ${{ secrets.NAMESPACE}} --timeout=300s
