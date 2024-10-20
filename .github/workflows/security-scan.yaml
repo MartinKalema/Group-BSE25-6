@@ -16,28 +16,28 @@ jobs:
 
       - name: List directory contents
         run: ls -R
-        
-      - name: Check for package.json
-        run: |
-          if [ -f "./package.json" ]; then
-            echo "package.json found"
-            cat package.json
-          else
-            echo "package.json not found in the root directory"
-            find . -name "package.json"
-          fi
 
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@master
+      - name: Run Snyk on Backend
+        working-directory: ./backend
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
-          args: --all-projects
+        run: |
+          npm install
+          npx snyk test
 
-      - name: Upload Snyk result
+      - name: Run Snyk on Frontend
+        working-directory: ./frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          npm install
+          npx snyk test
+
+      - name: Upload Snyk results
         uses: actions/upload-artifact@v2
         with:
-          name: snyk-scan-result
-          path: snyk-result.json
+          name: snyk-scan-results
+          path: |
+            ./backend/snyk-result.json
+            ./frontend/snyk-result.json
         if: always()
