@@ -120,22 +120,25 @@ jobs:
       - name: Deploy to EC2
         id: deploy
         env:
-          EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
-          ECR_BACKEND_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
-          ECR_FRONTEND_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          NAMESPACE: ${{ secrets.NAMESPACE }}
           DEPLOYMENT_BRANCH: ${{ github.event.inputs.environment || 'staging' }}
           BACKEND_IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
           FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
-          PROJECT_URL: ${{ secrets.PROJECT_URL }}
-          DOCKER_SERVER: ${{ secrets.DOCKER_SERVER }}
-          AWS_EMAIL: ${{ secrets.AWS_EMAIL }}
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
 
             set -euo pipefail
+
+            sudo apt install awscli
+
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ secrets.AWS_REGION}}
+
+            if ! aws sts get-caller-identity &>/dev/null; then
+              echo "Error: AWS credentials are not valid or not set correctly"
+              exit 1
+            fi
 
             if ! command -v minikube &> /dev/null; then
               echo "Minikube not found, installing..."
@@ -149,41 +152,39 @@ jobs:
 
             rm -rf deployment
 
-            git clone --branch $DEPLOYMENT_BRANCH --depth 1 --filter=blob:none --sparse $PROJECT_URL deployment
+            git clone --branch $DEPLOYMENT_BRANCH --depth 1 --filter=blob:none --sparse ${{ secrets.PROJECT_URL }} deployment
             cd deployment
             git sparse-checkout set K8s/
 
-            kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-
-            export ECR_PASSWORD=\$(aws ecr get-login-password --region $AWS_REGION)
+            kubectl create namespace ${{ secrets.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
 
             kubectl create secret docker-registry ecr-secret \
-            --docker-server=$DOCKER_SERVER \
+            --docker-server=${{ secrets.DOCKER_SERVER }} \
             --docker-username=AWS \
-            --docker-password=$ECR_PASSWORD \
-            --docker-email=$AWS_EMAIL \
-            -n $NAMESPACE \
+            --docker-password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }}) \
+            --docker-email=${{ secrets.AWS_EMAIL}} \
+            --namespace=${{ secrets.NAMESPACE}} \
             --dry-run=client -o yaml | kubectl apply -f -
 
-            kubectl patch serviceaccount default -n $NAMESPACE -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
+            kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
             cd K8s
 
             kubectl apply -f .
 
-            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n $NAMESPACE --record
-            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n $NAMESPACE --record
+            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n ${{ secrets.NAMESPACE}} --record
+            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n ${{ secrets.NAMESPACE}} --record
 
-            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image $BACKEND_IMAGE" --overwrite -n $NAMESPACE
-            kubectl annotate deployment/backend previous-image="$BACKEND_IMAGE" --overwrite -n "$NAMESPACE"
-            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image $FRONTEND_IMAGE" --overwrite -n $NAMESPACE
-            kubectl annotate deployment/frontend previous-image=$FRONTEND_IMAGE --overwrite -n $NAMESPACE
+            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image $BACKEND_IMAGE" --overwrite -n ${{ secrets.NAMESPACE}}
+            kubectl annotate deployment/backend previous-image="$BACKEND_IMAGE" --overwrite -n "${{ secrets.NAMESPACE}}"
+            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image $FRONTEND_IMAGE" --overwrite -n ${{ secrets.NAMESPACE}}
+            kubectl annotate deployment/frontend previous-image=$FRONTEND_IMAGE --overwrite -n ${{ secrets.NAMESPACE}}
 
-            kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
-            kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+            kubectl rollout status deployment/backend -n ${{ secrets.NAMESPACE}} --timeout=300s
+            kubectl rollout status deployment/frontend -n ${{ secrets.NAMESPACE}} --timeout=300s
 
             pkill -f "kubectl port-forward" || true
-            nohup kubectl port-forward svc/frontend -n $NAMESPACE 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
+            nohup kubectl port-forward svc/frontend -n ${{ secrets.NAMESPACE}} 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
 
           EOF
           echo "deploy_success=true" >> $GITHUB_OUTPUT
@@ -195,39 +196,34 @@ jobs:
       name: ${{ github.event.inputs.environment || 'staging' }}
     steps:
       - name: Set up SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
       - name: Rollback Deployment
-        env:
-          EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
-          NAMESPACE: ${{ secrets.NAMESPACE }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
             set -euo pipefail
 
-            kubectl rollout undo deployment/backend -n $NAMESPACE && \
+            kubectl rollout undo deployment/backend -n ${{ secrets.NAMESPACE}} && \
             echo "Backend rollback initiated successfully" || \
             { echo "Backend rollback failed"; exit 1; }
 
-            kubectl rollout undo deployment/frontend -n $NAMESPACE && \
+            kubectl rollout undo deployment/frontend -n ${{ secrets.NAMESPACE}} && \
             echo "Frontend rollback initiated successfully" || \
             { echo "Frontend rollback failed"; exit 1; }
 
-            kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s && \
+            kubectl rollout status deployment/backend -n ${{ secrets.NAMESPACE}} --timeout=300s && \
             echo "Backend rollback completed successfully" || \
             { echo "Backend rollback status check failed"; exit 1; }
 
-            kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s && \
+            kubectl rollout status deployment/frontend -n ${{ secrets.NAMESPACE}} --timeout=300s && \
             echo "Frontend rollback completed successfully" || \
             { echo "Frontend rollback status check failed"; exit 1; }
 
-            BACKEND_ROLLED_IMAGE=$(kubectl get deployment/backend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}')
-            FRONTEND_ROLLED_IMAGE=$(kubectl get deployment/frontend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}')
+            BACKEND_ROLLED_IMAGE=$(kubectl get deployment/backend -n ${{ secrets.NAMESPACE}} -o=jsonpath='{.spec.template.spec.containers[0].image}')
+            FRONTEND_ROLLED_IMAGE=$(kubectl get deployment/frontend -n ${{ secrets.NAMESPACE}} -o=jsonpath='{.spec.template.spec.containers[0].image}')
 
             echo "Backend rolled back to image: $BACKEND_ROLLED_IMAGE"
             echo "Frontend rolled back to image: $FRONTEND_ROLLED_IMAGE"
