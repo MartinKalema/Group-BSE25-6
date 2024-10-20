@@ -156,18 +156,20 @@ jobs:
             cd deployment
             git sparse-checkout set K8s/
 
-            cd K8s
+            kubectl create namespace ${{ secrets.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
 
-            kubectl apply -f namespace.yaml
+            export ECR_PASSWORD=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})
 
             kubectl create secret docker-registry ecr-secret \
             --docker-server=${{ secrets.DOCKER_SERVER }} \
-            --docker-username=${{ secrets.DOCKER_USERNAME }} \
-            --docker-password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }}) \
+            --docker-username=AWS \
+            --docker-password="$ECR_PASSWORD" \
             --docker-email=${{ secrets.AWS_EMAIL }} \
-            --namespace=${{ secrets.NAMESPACE }}
+            -n bse256
 
             kubectl patch serviceaccount default -n ${{ secrets.NAMESPACE}} -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
+
+            cd K8s
 
             kubectl apply -f .
 
