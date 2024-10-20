@@ -209,16 +209,15 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_STATIC_IP }} >> ~/.ssh/known_hosts
 
       - name: Rollback Deployment
         env:
           EC2_HOST: ${{ secrets.EC2_STATIC_IP }}
           NAMESPACE: ${{ secrets.NAMESPACE }}
         run: |
-          ssh ubuntu@"$EC2_HOST" << EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << 'EOF'
             set -euo pipefail
 
             kubectl rollout undo deployment/backend -n "$NAMESPACE" || { echo "Backend rollback failed"; exit 1; }
@@ -248,19 +247,26 @@ jobs:
 
       - name: Delete old ECR images
         run: |
-          set -e
+          set -euo pipefail
+
+          if ! command -v jq &> /dev/null || ! command -v aws &> /dev/null; then
+              echo "Error: jq or aws CLI not found. Please install the required tools."
+              exit 1
+          fi
+
           REPOSITORIES=(${{ secrets.ECR_BACKEND_REPOSITORY }} ${{ secrets.ECR_FRONTEND_REPOSITORY }})
           for REPO in "${REPOSITORIES[@]}"
           do
-            echo "Cleaning up repository: $REPO"
-            IMAGES_TO_DELETE=$(aws ecr list-images --repository-name "$REPO" --query 'imageIds[?type(imageTag)!=`string`].[imageDigest]' --output text | tr '\t' '\n' | sort | head -n -5)
-            if [ -n "$IMAGES_TO_DELETE" ]; then
-              if aws ecr batch-delete-image --repository-name "$REPO" --image-ids $(echo "$IMAGES_TO_DELETE" | jq -R -s -c 'split("\n")[:-1] | map({imageDigest: .})'); then
-                echo "Successfully deleted old images in $REPO"
+              echo "Cleaning up repository: $REPO"
+              IMAGES_TO_DELETE=$(aws ecr list-images --repository-name "$REPO" --query 'imageIds[?type(imageTag)!=`string`].[imageDigest]' --output text | tr '\t' '\n' | sort | head -n -5)
+              if [ -n "$IMAGES_TO_DELETE" ]; then
+                  if aws ecr batch-delete-image --repository-name "$REPO" --image-ids "$(echo "$IMAGES_TO_DELETE" | jq -R -s -c 'split("\n")[:-1] | map({imageDigest: .})')"; then
+                      echo "Successfully deleted old images in $REPO"
+                  else
+                      echo "Failed to delete images in $REPO"
+                      exit 1
+                  fi
               else
-                echo "Failed to delete images in $REPO"
+                  echo "No images to delete in $REPO"
               fi
-            else
-              echo "No images to delete in $REPO"
-            fi
           done
