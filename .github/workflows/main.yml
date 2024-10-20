@@ -61,7 +61,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -69,7 +69,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push backend image
         id: build_backend
@@ -140,8 +140,6 @@ jobs:
         id: deploy
         env:
           DEPLOYMENT_BRANCH: ${{ github.event.inputs.environment || 'staging' }}
-          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.backend_image }}
-          FRONTEND_IMAGE: ${{ needs.build-and-push.outputs.frontend_image }}
         if: success()
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
@@ -284,7 +282,7 @@ jobs:
     if: always()
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -292,7 +290,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Delete old ECR images
         run: |
