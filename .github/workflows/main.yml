@@ -96,7 +96,7 @@ jobs:
           echo "Debug: Frontend image set to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
       - name: Upload URI artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: image-uris
           path: |
