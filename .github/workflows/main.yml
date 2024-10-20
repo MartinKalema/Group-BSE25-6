@@ -166,6 +166,8 @@ jobs:
           --docker-email=${{ secrets.AWS_EMAIL }} \
           -n bse256
 
+          echo "Hello"
+
           kubectl patch serviceaccount default -n bse256 -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
           kubectl apply -f configmap.yaml
