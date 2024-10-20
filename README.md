@@ -1,4 +1,4 @@
-# Dental Clinic System
+# Dental Clinic System.
 
 This project is focused on building and managing the backend for a Dental Clinic System, supporting a fully developed frontend. The backend integrates a range of modern technologies to ensure smooth deployment, monitoring, and scalability across different environments.
 
