@@ -22,7 +22,7 @@ spec:
             - name: NODE_ENV
               value: production
             - name: MONGO_URI
-              value: 'mongodb://$(MONGO_ROOT_USERNAME):$(MONGO_ROOT_PASSWORD)@db.bse256.svc.cluster.local:27017/bse256?authSource=admin'
+              value: mongodb://$(MONGO_ROOT_USERNAME):$(MONGO_ROOT_PASSWORD)@db:27017/bse256?authSource=admin
           envFrom:
             - secretRef:
                 name: mongodb-secret
