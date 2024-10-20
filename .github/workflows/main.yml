@@ -168,8 +168,6 @@ jobs:
 
           kubectl patch serviceaccount default -n bse256 -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
-          kubectl apply -f configmap.yaml
-          kubectl apply -f mongo-secrets.yaml
           kubectl apply -f mongodb-deployment.yaml
           kubectl apply -f mongodb-service.yaml
           kubectl apply -f backend-deployment.yaml
