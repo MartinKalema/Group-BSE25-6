@@ -19,18 +19,8 @@ spec:
           ports:
             - containerPort: 5000
           env:
-            - name: NODE_ENV
-              value: production
-            - name: MONGO_ROOT_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mongodb-secret
-                  key: mongo-root-username
-            - name: MONGO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mongodb-secret
-                  key: mongo-root-password
+            - name: MONGO_URI
+              value: "mongodb://admin:admin@mongodb:27017/dental"
           readinessProbe:
             exec:
               command: ['node', 'healthcheck.js']

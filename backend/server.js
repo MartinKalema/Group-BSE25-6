@@ -6,8 +6,7 @@ const app = express();
 
 // MongoDB connection
 const MONGO_URI =
-  process.env.MONGO_URI ||
-  `mongodb://${process.env.MONGO_ROOT_USERNAME}:${process.env.MONGO_ROOT_PASSWORD}@db:27017/bse256?authSource=admin`;
+  process.env.MONGO_URI || 'mongodb://admin:admin@mongodb:27017/dental';
 
 mongoose
   .connect(MONGO_URI)
