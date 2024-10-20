@@ -23,14 +23,14 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
-                  key: mongo_root_username
+                  key: mongo-root-username
             - name: MONGO_INITDB_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
-                  key: mongo_root_password
+                  key: mongo-root-password
             - name: MONGO_INITDB_DATABASE
               valueFrom:
                 secretKeyRef:
                   name: mongodb-secret
-                  key: mongo_database_name
+                  key: mongo-database-name
