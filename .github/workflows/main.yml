@@ -139,9 +139,11 @@ jobs:
 
             set -euo pipefail
             
-            aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
-            aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
-            aws configure set region "$AWS_REGION"
+            sudo apt install awscli
+
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set region $AWS_REGION
 
             if ! aws sts get-caller-identity &>/dev/null; then
               echo "Error: AWS credentials are not valid or not set correctly"
@@ -160,37 +162,38 @@ jobs:
 
             rm -rf deployment
 
-            git clone --branch "$DEPLOYMENT_BRANCH" --depth 1 --filter=blob:none --sparse "$PROJECT_URL" deployment
+            git clone --branch $DEPLOYMENT_BRANCH --depth 1 --filter=blob:none --sparse $PROJECT_URL deployment
             cd deployment
             git sparse-checkout set K8s/
 
-            kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
 
             export ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_REGION)
 
             kubectl create secret docker-registry ecr-secret \
-            --docker-server="$DOCKER_SERVER" \
+            --docker-server=$DOCKER_SERVER \
             --docker-username=AWS \
-            --docker-password="$ECR_PASSWORD" \
-            --docker-email="$AWS_EMAIL" \
-            -n "NAMESPACE" \
+            --docker-password=$ECR_PASSWORD \
+            --docker-email=$AWS_EMAIL \
+            -n $NAMESPACE \
             --dry-run=client -o yaml | kubectl apply -f -
 
-            kubectl patch serviceaccount default -n "$NAMESPACE" -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
+            kubectl patch serviceaccount default -n $NAMESPACE -p '{"imagePullSecrets": [{"name": "ecr-secret"}]}'
 
             cd K8s
+
             kubectl apply -f .
 
-            kubectl set image deployment/backend backend="$BACKEND_IMAGE" -n "$NAMESPACE" --record
-            kubectl set image deployment/frontend frontend="$FRONTEND_IMAGE" -n "$NAMESPACE" --record
+            kubectl set image deployment/backend backend=$BACKEND_IMAGE -n $NAMESPACE --record
+            kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE -n $NAMESPACE --record
 
-            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image $BACKEND_IMAGE" --overwrite -n "$NAMESPACE"
+            kubectl annotate deployment/backend kubernetes.io/change-cause="Deployed image $BACKEND_IMAGE" --overwrite -n $NAMESPACE
             kubectl annotate deployment/backend previous-image="$BACKEND_IMAGE" --overwrite -n "$NAMESPACE"
-            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image $FRONTEND_IMAGE" --overwrite -n "$NAMESPACE"
-            kubectl annotate deployment/frontend previous-image="$FRONTEND_IMAGE" --overwrite -n "$NAMESPACE"
+            kubectl annotate deployment/frontend kubernetes.io/change-cause="Deployed image $FRONTEND_IMAGE" --overwrite -n $NAMESPACE
+            kubectl annotate deployment/frontend previous-image=$FRONTEND_IMAGE --overwrite -n $NAMESPACE
 
-            kubectl rollout status deployment/backend -n "$NAMESPACE" --timeout=300s
-            kubectl rollout status deployment/frontend -n "$NAMESPACE" --timeout=300s
+            kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
+            kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
 
             pkill -f "kubectl port-forward" || true
             nohup kubectl port-forward svc/frontend -n $NAMESPACE 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
@@ -220,14 +223,24 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@$EC2_HOST << 'EOF'
             set -euo pipefail
 
-            kubectl rollout undo deployment/backend -n "$NAMESPACE" || { echo "Backend rollback failed"; exit 1; }
-            kubectl rollout undo deployment/frontend -n "$NAMESPACE" || { echo "Frontend rollback failed"; exit 1; }
+            kubectl rollout undo deployment/backend -n $NAMESPACE && \
+            echo "Backend rollback initiated successfully" || \
+            { echo "Backend rollback failed"; exit 1; }
 
-            kubectl rollout status deployment/backend -n "$NAMESPACE" --timeout=300s
-            kubectl rollout status deployment/frontend -n "$NAMESPACE" --timeout=300s
+            kubectl rollout undo deployment/frontend -n $NAMESPACE && \
+            echo "Frontend rollback initiated successfully" || \
+            { echo "Frontend rollback failed"; exit 1; }
 
-            BACKEND_ROLLED_IMAGE=$(kubectl get deployment/backend -n "$NAMESPACE" -o=jsonpath='{.spec.template.spec.containers[0].image}')
-            FRONTEND_ROLLED_IMAGE=$(kubectl get deployment/frontend -n "$NAMESPACE" -o=jsonpath='{.spec.template.spec.containers[0].image}')
+            kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s && \
+            echo "Backend rollback completed successfully" || \
+            { echo "Backend rollback status check failed"; exit 1; }
+
+            kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s && \
+            echo "Frontend rollback completed successfully" || \
+            { echo "Frontend rollback status check failed"; exit 1; }
+
+            BACKEND_ROLLED_IMAGE=$(kubectl get deployment/backend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}')
+            FRONTEND_ROLLED_IMAGE=$(kubectl get deployment/frontend -n $NAMESPACE -o=jsonpath='{.spec.template.spec.containers[0].image}')
 
             echo "Backend rolled back to image: $BACKEND_ROLLED_IMAGE"
             echo "Frontend rolled back to image: $FRONTEND_ROLLED_IMAGE"
@@ -244,6 +257,10 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
       - name: Delete old ECR images
         run: |
