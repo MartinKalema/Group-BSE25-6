@@ -56,9 +56,6 @@ jobs:
     needs: install-and-test
     runs-on: ubuntu-latest
     if: github.event.inputs.action != 'rollback'
-    outputs:
-      backend_image: ${{ steps.build_backend.outputs.uri }}
-      frontend_image: ${{ steps.build_frontend.outputs.uri }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -83,7 +80,7 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=uri::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" > backend_uri.txt
           echo "Debug: Backend image set to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
       - name: Build and push frontend image
@@ -95,8 +92,16 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "::set-output name=uri::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" > frontend_uri.txt
           echo "Debug: Frontend image set to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Upload URI artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: image-uris
+          path: |
+            backend_uri.txt
+            frontend_uri.txt
 
   deploy:
     needs: build-and-push
@@ -111,10 +116,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Debug Build Outputs
+      - name: Download URI artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: image-uris
+
+      - name: Set image URIs
         run: |
-          echo "Backend Image: ${{ needs.build-and-push.outputs.backend_image }}"
-          echo "Frontend Image: ${{ needs.build-and-push.outputs.frontend_image }}"
+          BACKEND_IMAGE=$(cat backend_uri.txt)
+          FRONTEND_IMAGE=$(cat frontend_uri.txt)
+          echo "BACKEND_IMAGE=$BACKEND_IMAGE" >> $GITHUB_ENV
+          echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> $GITHUB_ENV
+          echo "Debug: Backend Image: $BACKEND_IMAGE"
+          echo "Debug: Frontend Image: $FRONTEND_IMAGE"
 
       - name: Set up SSH
         run: |
