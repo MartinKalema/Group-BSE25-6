@@ -135,7 +135,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         if: success()
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -o SendEnv=AWS_ACCESS_KEY_ID -o SendEnv=AWS_SECRET_ACCESS_KEY - SendEnv=AWS_REGION ubuntu@$EC2_HOST << EOF
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -o SendEnv=AWS_ACCESS_KEY_ID -o SendEnv=AWS_SECRET_ACCESS_KEY -o SendEnv=AWS_REGION ubuntu@$EC2_HOST << EOF
 
             set -euo pipefail
             
