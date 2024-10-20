@@ -1,0 +1,21 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [staging, production]
+  pull_request:
+    branches: [staging, production]
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
