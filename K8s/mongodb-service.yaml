@@ -6,7 +6,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 27017
+    - protocol: TCP
+      port: 27017
       targetPort: 27017
   selector:
     app: db

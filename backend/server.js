@@ -6,7 +6,7 @@ const app = express();
 // MongoDB connection
 const MONGO_URI =
   process.env.MONGO_URI ||
-  'mongodb://admin:admin@mongodb:27017/bse256?authSource=admin';
+  'mongodb://admin:admin@db:27017/bse256?authSource=admin';
 mongoose
   .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB connected'))
