@@ -108,6 +108,11 @@ jobs:
       deploy_success: ${{ steps.deploy.outputs.deploy_success }}
 
     steps:
+      - name: Debug Build Outputs
+        run: |
+          echo "Backend Image: ${{ needs.build-and-push.outputs.backend_image }}"
+          echo "Frontend Image: ${{ needs.build-and-push.outputs.frontend_image }}"
+
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
