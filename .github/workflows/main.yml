@@ -123,6 +123,9 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_STATIC_IP}} << EOF
             set -euo pipefail
 
+            echo "Debug: BACKEND_IMAGE=${BACKEND_IMAGE}"
+            echo "Debug: FRONTEND_IMAGE=${FRONTEND_IMAGE}"
+
             if ! command -v aws &> /dev/null; then
               echo "AWS CLI not found, installing..."
               sudo apt update
@@ -211,7 +214,7 @@ jobs:
           EOF
           echo "deploy_success=true" >> $GITHUB_OUTPUT
 
-  rollback: 
+  rollback:
     runs-on: ubuntu-latest
     if: failure() || github.event.inputs.action == 'rollback'
     environment:
