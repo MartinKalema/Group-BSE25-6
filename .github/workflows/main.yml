@@ -179,7 +179,9 @@ jobs:
             cd deployment
             git sparse-checkout set K8s/
 
-            kubectl create namespace ${{ secrets.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create namespace ${{ secrets.NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f - && \
+
+            kubectl create namespace ${{ secrets.MONITORING_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
 
             kubectl get serviceaccount default -n ${{ secrets.NAMESPACE}} || kubectl create serviceaccount default -n ${{ secrets.NAMESPACE}}
 
@@ -235,6 +237,7 @@ jobs:
 
             pkill -f "kubectl port-forward" || true
             nohup kubectl port-forward svc/frontend -n ${{ secrets.NAMESPACE}} 3000:80 --address 0.0.0.0 > /dev/null 2>&1 &
+            nohup kubectl port-forward svc/grafana -n ${{ secrets.MONITORING_NAMESPACE }} 4000:4000 --address 0.0.0.0 > /dev/null 2>&1 & 
           EOF
           echo "deploy_success=true" >> $GITHUB_OUTPUT
 
