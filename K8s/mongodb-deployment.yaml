@@ -23,5 +23,3 @@ spec:
               value: 'root'
             - name: MONGO_INITDB_ROOT_PASSWORD
               value: 'root'
-            - name: MONG0_INITDB_DATABASE
-              value: 'db'

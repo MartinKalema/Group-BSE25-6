@@ -6,7 +6,7 @@ const app = express();
 
 // MongoDB connection
 const MONGO_URI =
-  process.env.MONGO_URI || "mongodb://root:root@mongodb:27017/db";
+  process.env.MONGO_URI || 'mongodb://root:root@mongodb:27017/admin';
 
 mongoose
   .connect(MONGO_URI)
