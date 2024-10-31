@@ -32,7 +32,6 @@ By combining CI/CD pipelines, test coverage, and robust container management, th
 - Node.js and npm
 - Kubernetes (minikube or any other Kubernetes distribution)
 - ESBuild
-- GitHub account
 
 ### Steps
 
